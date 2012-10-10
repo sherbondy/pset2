@@ -1,0 +1,2 @@
+(ns markov.core
+  (:use [clojure.math.numeric-tower]))
