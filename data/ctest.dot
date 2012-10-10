@@ -1,12 +1,12 @@
 digraph G {
-	node0 [label="0. age of wisdom, it was"];
-	node2 [label="2. it was the"];
-	node3 [label="3. It was the"];
-	node4 [label="4. age of foolishness"];
-	node9 [label="9. was the best of times,"];
-	node13 [label="13. was the worst of times,"];
-	node14 [label="14. was the age of"];
-	node15 [label="15. of times, it was"];
+	node0 [label="0. age of wisdom, it was *1*"];
+	node2 [label="2. it was the *4*"];
+	node3 [label="3. It was the *1*"];
+	node4 [label="4. age of foolishness *2*"];
+	node9 [label="9. was the best of times, *2*"];
+	node13 [label="13. was the worst of times, *1*"];
+	node14 [label="14. was the age of *2*"];
+	node15 [label="15. of times, it was *2*"];
 	node15 -> node2;
 	node14 -> node0;
 	node14 -> node4;

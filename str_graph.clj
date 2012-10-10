@@ -53,12 +53,17 @@
 (str-prefix ["it" "was" "the"])
 (str-prefix "it was the")
 
-(defn fill-fixes [filename]
+(defn fill-fixes
+  "Populate the prefix and suffix maps"
+  [filename]
   (let [text (slurp filename)
         lines (str/split text #"\n")
         prefixes (atom {})
         suffixes (atom {})
-        V        (into [] (set lines))]
+        V        (into [] (set lines))
+        v-counts (into {} (map-indexed (fn [idx v]
+                                         [idx (count (filter #(= v %) lines))])
+                                       V))]
     (doseq [i (range (count V))]
       (let [line (V i)]
         (let [words (str/split line #"\s+")]
@@ -66,26 +71,25 @@
                 suffix     (str-suffix words)]
             (add-elem! prefixes prefix i)
             (add-elem! suffixes suffix i)))))
-  [V @prefixes @suffixes]))
+  [V v-counts @prefixes @suffixes]))
 
 (fill-fixes "dickens_reads.txt")
 
-e
 (defn make-initial-graph [filename]
-  (let [[V prefixes suffixes] (fill-fixes filename)
+  (let [[V v-counts prefixes suffixes] (fill-fixes filename)
         E (atom {})]
     (doseq [[suffix from-vs] suffixes]
       (let [to-vs (prefixes suffix)]
         (doseq [from-v from-vs to-v to-vs]
           (add-elem! E from-v to-v))))
-    [V @E]))
+    [V v-counts @E]))
 
-(def ve (make-initial-graph "dickens_reads.txt"))
+(def vce (make-initial-graph "dickens_reads.txt"))
 
 ;; {0 #{6}, 1 #{12}, 2 #{9 13 14}, 3 #{9 13 14}, 5 #{0 4}, 6 #{7}, 7 #{2},
 ;; 8 #{15}, 9 #{1}, 10 #{8}, 11 #{2}, 12 #{15}, 13 #{10}, 14 #{5}, 15 #{11}}
 
-(defn remove-transitive-overlaps [V E]
+(defn remove-transitive-overlaps [V C E]
   (let [E (atom E)
         v-range (range (count V))]
     (doseq [x v-range
@@ -95,7 +99,7 @@ e
                (contains? (@E y) z))
         (let [new-set (disj (@E x) z)]
           (swap! E assoc x new-set))))
-  [V @E]))
+  [V C @E]))
 
 (apply remove-transitive-overlaps (make-initial-graph "dickens_reads.txt"))
 
@@ -130,7 +134,7 @@ e
 (defn drop-ends [sequence]
   (drop 1 (drop-last sequence)))
 
-(defn collapse-chains [V E]
+(defn collapse-chains [V C E]
   ;; determine where the chains are
   (let [chains (atom {})
         collapse (atom #{})
@@ -163,37 +167,37 @@ e
                 (swap! aE assoc v old-val)
                 (swap! aV assoc v (V v)))))))
 
-      [@aV @aE])))
+      [@aV C @aE])))
 
-(defn graphviz [V E]
+(defn graphviz [V C E]
   (let [in-degs (in-degrees V E)
         out-degs (out-degrees V E)]
     (apply str
-         (flatten [["digraph G {\n"]
-                   (for [node (range (count V))]
-                     (if (or (< 0 (in-degs node))
-                             (< 0 (out-degs node)))
-                       (str "\t" "node" node
-                            " [label=\"" (str node ". " (V node)) "\"]"
-                            ";\n")))
+           (flatten [["digraph G {\n"]
+                     (for [node (range (count V))]
+                       (if (or (< 0 (in-degs node))
+                               (< 0 (out-degs node)))
+                         (str "\t" "node" node
+                              " [label=\"" (str node ". " (V node)) " " (C node) "\"]"
+                              ";\n")))
 
-                   (for [[node siblings] E]
-                     (for [sibling siblings]
-                       (str "\t" "node" node " -> " "node" sibling ";\n")))
-                   ["}"]]))))
+                     (for [[node siblings] E]
+                       (for [sibling siblings]
+                         (str "\t" "node" node " -> " "node" sibling ";\n")))
+                     ["}"]]))))
 
-(apply graphviz dgraph)
+(apply graphviz ve)
 
-(defn make-pdf-graph [[V E] graph-name]
+(defn make-pdf-graph [[V C E] graph-name]
   (let [graph-file (str "data/" graph-name ".dot")
         graph-pdf  (str/replace graph-file "dot" "pdf")]
     (with-open [wrtr (io/writer graph-file)]
-      (.write wrtr (graphviz V E)))
+      (.write wrtr (graphviz V C E)))
   
     (sh "dot" "-Tpdf" graph-file "-o" graph-pdf)))
 
-(def collapsed-ve (apply collapse-chains ve))
-(make-pdf-graph dgraph "testing")
+(def collapsed-ve (apply collapse-chains vce))
+(make-pdf-graph vce "testing")
 (make-pdf-graph collapsed-ve "ctest")
 
 ;; Now the idea is to trim things that could only belong to one parent
