@@ -105,3 +105,5 @@ alignment-2 ;; (3 3 6 2 6 3 6 2 3 2)
 ;; since we know P(seq|C) and P(seq|N), we could determine the conditional
 ;; probabilities P(C|seq) and P(N|seq):
 ;; P(N|seq) = P(seq|N)*P(N) / P(seq)
+
+
