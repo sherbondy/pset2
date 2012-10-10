@@ -50,8 +50,8 @@
 (defn last-word [words]
   (last (str-array words)))
 
-(str-prefix ["it" "was" "the"])
-(str-prefix "it was the")
+; (str-prefix ["it" "was" "the"])
+; (str-prefix "it was the")
 
 (defn fill-fixes
   "Populate the prefix and suffix maps"
@@ -73,7 +73,7 @@
             (add-elem! suffixes suffix i)))))
   [V v-counts @prefixes @suffixes]))
 
-(fill-fixes "dickens_reads.txt")
+; (def VCPS (fill-fixes "../../dickens_reads.txt"))
 
 (defn make-initial-graph [filename]
   (let [[V v-counts prefixes suffixes] (fill-fixes filename)
@@ -84,7 +84,7 @@
           (add-elem! E from-v to-v))))
     [V v-counts @E]))
 
-(def vce (make-initial-graph "dickens_reads.txt"))
+; (def vce (make-initial-graph "../../dickens_reads.txt"))
 
 ;; {0 #{6}, 1 #{12}, 2 #{9 13 14}, 3 #{9 13 14}, 5 #{0 4}, 6 #{7}, 7 #{2},
 ;; 8 #{15}, 9 #{1}, 10 #{8}, 11 #{2}, 12 #{15}, 13 #{10}, 14 #{5}, 15 #{11}}
@@ -101,7 +101,7 @@
           (swap! E assoc x new-set))))
   [V C @E]))
 
-(apply remove-transitive-overlaps (make-initial-graph "dickens_reads.txt"))
+; (apply remove-transitive-overlaps vce)
 
 ;; {0 #{6}, 1 #{12}, 2 #{9 13 14}, 3 #{9 13 14}, 5 #{0 4}, 6 #{7}, 7 #{2},
 ;; 8 #{15},9 #{1}, 10 #{8}, 11 #{2}, 12 #{15}, 13 #{10}, 14 #{5}, 15 #{11}}
@@ -211,7 +211,7 @@
                          (str "\t" "node" node " -> " "node" sibling ";\n")))
                      ["}"]]))))
 
-(apply graphviz vce)
+; (apply graphviz vce)
 
 (defn make-pdf-graph [[V C E] graph-name]
   (let [graph-file (str "data/" graph-name ".dot")
@@ -221,10 +221,10 @@
   
     (sh "dot" "-Tpdf" graph-file "-o" graph-pdf)))
 
-(def collapsed-ve (apply collapse-chains vce))
+; (def collapsed-ve (apply collapse-chains vce))
 
-(make-pdf-graph vce "initial-graph")
-(make-pdf-graph collapsed-ve "trimmed-graph")
+; (make-pdf-graph vce "initial-graph")
+; (make-pdf-graph collapsed-ve "trimmed-graph")
 
 
 (defn viable-path-values [V C E]
@@ -241,7 +241,7 @@
 
             (str (str/join " " sentence) ".")))))))
         
-(apply viable-path-values collapsed-ve)
+; (apply viable-path-values collapsed-ve)
 
 ;; "It was the best of times, it was the best of times, it was the age of wisdom, it was the age of foolishness."
 ;; "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness."

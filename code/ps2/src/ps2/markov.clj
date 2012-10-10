@@ -12,7 +12,7 @@
 (defn n-choose [n k]
   (int (/ (fact n) (* (fact k) (fact (- n k))))))
 
-(n-choose 4 2)
+; (n-choose 4 2)
 ;; 6
 
 (defn alignment-score [bases]
@@ -24,14 +24,14 @@
             (for [[k v] @base-counts]
               (int (n-choose v 2))))))
 
-(alignment-score [:A :A :C :C])
+; (alignment-score [:A :A :C :C])
 ;; 2
 
 (def es
   {:N {0 0.1,  1 0.35, 2 0.25, 3 0.2, 6 0.1}
    :C {0 0.05, 1 0.15, 2 0.2,  3 0.3, 6 0.3}})
 
-(get-in es [:N 0])
+; (get-in es [:N 0])
 ;; 0.1
 
 (defn rand-emissions [state n]
@@ -41,14 +41,14 @@
     (for [i (range n)]
       (rand-nth hun-scores))))
       
-(rand-emissions :C 5)
+; (rand-emissions :C 5)
 
 (defn p-scores|state [scores state]
   (apply * (map #(get-in es [state %]) scores)))
 
-(p-scores|state [3 3 3] :C)
+; (p-scores|state [3 3 3] :C)
 ;; 0.027
-(p-scores|state [6 2 3 0] :N)
+; (p-scores|state [6 2 3 0] :N)
 ;; 5e-4
 
 (def alignment-1
@@ -61,14 +61,14 @@
        [[:A :A :T :A] [:C :A :C :C] [:A :A :A :A] [:A :A :T :T] [:C :C :C :C]
         [:G :G :G :T] [:A :A :A :A] [:G :A :G :A] [:T :T :T :C] [:A :A :T :T]]))
 
-alignment-1 ;; (1 0 1 1 1 1 0 0 0 2)
-alignment-2 ;; (3 3 6 2 6 3 6 2 3 2)
+; alignment-1 ;; (1 0 1 1 1 1 0 0 0 2)
+; alignment-2 ;; (3 3 6 2 6 3 6 2 3 2)
 
-(for [a [alignment-1 alignment-2]]
-  (for [s [:N :C]]
-    (p-scores|state a s)))
+; (for [a [alignment-1 alignment-2]]
+;   (for [s [:N :C]]
+;     (p-scores|state a s)))
 
-(p-scores|state alignment-2 :N)
+; (p-scores|state alignment-2 :N)
 
 ;; p(N|a1),                |   p(C|a1)                
 ;; 1.313046875E-7          |   9.4921875E-11
@@ -89,12 +89,12 @@ alignment-2 ;; (3 3 6 2 6 3 6 2 3 2)
          (swap! wins assoc winner (inc (@wins winner))))))
     @wins))
 
-(simulate-sequences 10000 10 :N)
+; (simulate-sequences 10000 10 :N)
 ;; b. The probability of a false positive p(C|sequence) > p(N|sequence)
 ;; is surprisingly high (> 10%):
 ;; Relative frequences ~ N = 8745 : C = 1255
 
-(simulate-sequences 10000 10 :C)
+; (simulate-sequences 10000 10 :C)
 ;; c. Likewise: N = 1416, C = 8584
 
 ;; d. There's a substantial chance for error when classifying based
