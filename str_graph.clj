@@ -169,6 +169,31 @@
 
       [@aV C @aE])))
 
+(defn derive-paths [V C E]
+  ;; run augmented bfs to determine the longest path that visits all edges
+  (let [in-degs  (in-degrees V E)
+        out-degs (out-degrees V E)
+        start (first (filter #(and (= 0 (in-degs %))
+                                   (< 0 (out-degs %)))
+                             (range (count V))))
+        initial-path [[start]]]
+    (loop [q initial-path]
+      (let [new-q
+            (filter #(not (nil? %))
+              (apply concat
+                   (for [path q]
+                     (let [end (last path)
+                           vs  (E end)]
+                       (if vs
+                         (for [v vs]
+                           (let [new-path (conj path v)]
+                             (if (< (count (filter #(= v %) path)) (C v))
+                               new-path)))
+                         [path])))))]
+        (if (not= q new-q)
+          (recur new-q)
+          q)))))
+
 (defn graphviz [V C E]
   (let [in-degs (in-degrees V E)
         out-degs (out-degrees V E)]
@@ -178,7 +203,7 @@
                        (if (or (< 0 (in-degs node))
                                (< 0 (out-degs node)))
                          (str "\t" "node" node
-                              " [label=\"" (str node ". " (V node)) " " (C node) "\"]"
+                              " [label=\"" (str node ". " (V node)) " *" (C node) "*\"]"
                               ";\n")))
 
                      (for [[node siblings] E]
@@ -186,7 +211,7 @@
                          (str "\t" "node" node " -> " "node" sibling ";\n")))
                      ["}"]]))))
 
-(apply graphviz ve)
+(apply graphviz vce)
 
 (defn make-pdf-graph [[V C E] graph-name]
   (let [graph-file (str "data/" graph-name ".dot")
@@ -197,8 +222,36 @@
     (sh "dot" "-Tpdf" graph-file "-o" graph-pdf)))
 
 (def collapsed-ve (apply collapse-chains vce))
-(make-pdf-graph vce "testing")
-(make-pdf-graph collapsed-ve "ctest")
 
-;; Now the idea is to trim things that could only belong to one parent
-;; and to remove anything that doesn't follow a chain
+(defn viable-path-values [V C E]
+  (let [viable-paths (derive-paths V C E)
+        max-path-count (apply max (map count viable-paths))
+        max-paths (filter #(= (count %) max-path-count) viable-paths)]
+    (for [path max-paths]
+      (let [pcount (count path)]
+        (loop [i 1 sentence [(V (first path))]]
+          (if (< i pcount)
+            (let [vi (nth path i)
+                  added-str (str-of-range (V vi) 2)]
+              (recur (inc i) (conj sentence added-str)))
+
+            (str (str/join " " sentence) ".")))))))
+        
+(apply viable-path-values collapsed-ve)
+
+;; "It was the best of times, it was the best of times, it was the age of wisdom, it was the age of foolishness."
+;; "It was the best of times, it was the worst of times, it was the age of wisdom, it was the age of foolishness."
+;; "It was the best of times, it was the age of wisdom, it was the best of times, it was the age of foolishness."
+;; "It was the best of times, it was the age of wisdom, it was the worst of times, it was the age of foolishness."
+;; "It was the worst of times, it was the best of times, it was the age of wisdom, it was the age of foolishness."
+;; "It was the worst of times, it was the age of wisdom, it was the best of times, it was the age of foolishness."
+;; "It was the age of wisdom, it was the best of times, it was the best of times, it was the age of foolishness."
+;; "It was the age of wisdom, it was the best of times, it was the worst of times, it was the age of foolishness."
+;; "It was the age of wisdom, it was the worst of times, it was the best of times, it was the age of foolishness."
+
+;; As you can see, I am unable to single out the actual sequence from the collapsed graph.
+;; All of the above are valid given the available information, due to repeats present in the
+;; original sequence.
+
+(make-pdf-graph vce "initial-graph")
+(make-pdf-graph collapsed-ve "trimmed-graph")
