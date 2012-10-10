@@ -145,7 +145,7 @@ e
           (if (< 1 (count chain))
             (swap! collapse s/union (set (drop-ends chain))))))
 
-    ;; now that we've determined what values can be collapsed
+    ;; now that we've determined which values should be collapsed
     ;; let's actually do the collapse operation and concatenate the vertex labels
     (let [aE (atom {})
           aV (atom V)]
@@ -171,10 +171,13 @@ e
 (def collapsed-ve (apply collapse-chains ve))
 
 (defn graphviz [V E]
-  (apply str
+  (let [in-degs (in-degrees V E)
+        out-degs (out-degrees V E)]
+    (apply str
          (flatten [["digraph G {\n"]
                    (for [node (range (count V))]
-                     (if (< 0 (count (E node)))
+                     (if (or (< 0 (in-degs node))
+                             (< 0 (out-degs node)))
                        (str "\t" "node" node
                             " [label=\"" (str node ". " (V node)) "\"]"
                             ";\n")))
@@ -182,7 +185,7 @@ e
                    (for [[node siblings] E]
                      (for [sibling siblings]
                        (str "\t" "node" node " -> " "node" sibling ";\n")))
-                   ["}"]])))
+                   ["}"]]))))
 
 (apply graphviz dgraph)
 
