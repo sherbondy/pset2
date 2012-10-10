@@ -1,6 +1,7 @@
 (ns str-graph.core
   (:require [clojure.string :as str]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.set :as s])
   
   (:use     [clojure.java.shell :only [sh]]))
 
@@ -8,50 +9,68 @@
 ;; for more info, see: http://www.clojure.org
 ;; I'm assuming 1a contains a typo: "three *letter* string" => *word*
 
-(defn add-elem! [a k v]
+(defn add-elem!
+  "Expects an atom representing a map whose values are sets as input.
+   Adds elem v to the set associated with k."
+  [a k v]
   (let [existing-k (@a k)]
     (let [swap-val (if existing-k
                      (conj existing-k v)
-                     [v])]
+                     #{v})]
       (swap! a assoc k swap-val))))
 
-(defn str-of-range [arr rstart & [rend]]
-  (let [rend (if rend
-               (min (count arr) (inc rend))
-               (count arr))]
-    (str/join " " (map #(nth arr %)
-                       (range rstart rend)))))
+(defn str-array [str-or-array]
+  (if (string? str-or-array)
+    (str/split str-or-array #"\s+")
+    str-or-array))
+
+(defn str-of-range
+  "Returns a string of the elements from arr
+   in the range (rstart..rend) joined by spaces."
+  [arr rstart & [rend]]
+  (let [arr (str-array arr)]
+    (let [rend (if rend
+                 (min (count arr) (inc rend))
+                 (count arr))]
+      (str/join " " (map #(nth arr %)
+                         (range rstart rend))))))
 
 (defn ps-len
   "The length of a prefix/suffix"
   [words]
-  (- (count words) 2))
+  (- (count (str-array words)) 2))
 
 (defn str-prefix [words]
   (str-of-range words 0 (ps-len words)))
 
 (defn str-suffix [words]
-  (str-of-range words (- (dec (count words))
+  (str-of-range words (- (dec (count (str-array words)))
                          (ps-len words))))
 
-(str-suffix ["it" "was" "the"])
+(defn last-word [words]
+  (last (str-array words)))
+
+(str-prefix ["it" "was" "the"])
+(str-prefix "it was the")
 
 (defn fill-fixes [filename]
   (let [text (slurp filename)
         lines (str/split text #"\n")
         prefixes (atom {})
         suffixes (atom {})
-        V        (atom [])]
-    (for [i (range (count lines))]
-      (let [line (lines i)]
-        (swap! V conj line)
+        V        (into [] (set lines))]
+    (doseq [i (range (count V))]
+      (let [line (V i)]
         (let [words (str/split line #"\s+")]
           (let [prefix     (str-prefix words)
                 suffix     (str-suffix words)]
             (add-elem! prefixes prefix i)
-            (add-elem! suffixes suffix i))))))
-  [@V @prefixes @suffixes])
+            (add-elem! suffixes suffix i)))))
+  [V @prefixes @suffixes]))
 
+(fill-fixes "dickens_reads.txt")
+
+e
 (defn make-initial-graph [filename]
   (let [[V prefixes suffixes] (fill-fixes filename)
         E (atom {})]
@@ -61,32 +80,113 @@
           (add-elem! E from-v to-v))))
     [V @E]))
 
-((make-initial-graph "dickens_reads.txt") 1)
+(def dgraph (make-initial-graph "dickens_reads.txt"))
 
-{0 [2 7 10 15 24], 2 [3], 3 [11 18], 4 [5 13],
- 5 [6 14 22 23], 6 [2 7 10 15 24], 7 [8 26],
- 8 [9 21], 9 [4 12], 10 [3], 11 [4 12], 12 [5 13],
- 13 [6 14 22 23], 14 [2 7 10 15 24], 15 [16 27],
- 16 [1 17 25], 17 [19], 18 [4 12], 19 [20],
- 20 [6 14 22 23], 21 [4 12], 22 [2 7 10 15 24],
- 23 [2 7 10 15 24], 24 [16 27], 26 [9 21], 27 [1 17 25]}
+;; {0 #{6}, 1 #{12}, 2 #{9 13 14}, 3 #{9 13 14}, 5 #{0 4}, 6 #{7}, 7 #{2},
+;; 8 #{15}, 9 #{1}, 10 #{8}, 11 #{2}, 12 #{15}, 13 #{10}, 14 #{5}, 15 #{11}}
+
+(defn remove-transitive-overlaps [V E]
+  (let [E (atom E)
+        v-range (range (count V))]
+    (doseq [x v-range
+          y v-range
+          z v-range]
+      (if (and (contains? (@E x) y)
+               (contains? (@E y) z))
+        (let [new-set (disj (@E x) z)]
+          (swap! E assoc x new-set))))
+  [V @E]))
+
+(apply remove-transitive-overlaps (make-initial-graph "dickens_reads.txt"))
+
+;; {0 #{6}, 1 #{12}, 2 #{9 13 14}, 3 #{9 13 14}, 5 #{0 4}, 6 #{7}, 7 #{2},
+;; 8 #{15},9 #{1}, 10 #{8}, 11 #{2}, 12 #{15}, 13 #{10}, 14 #{5}, 15 #{11}}
+
+(defn in-degrees [V E]
+  (let [v-count (count V)
+        in-counts (int-array (repeat v-count 0))]
+    (doseq [v (range v-count)]
+      (doseq [in-v (E v)]
+        (aset in-counts in-v
+              (inc (aget in-counts in-v)))))
+    (into [] in-counts)))
+
+(defn out-degrees [V E]
+  (let [v-count (count V)
+        out-counts (int-array (repeat v-count 0))]
+    (doseq [v (range v-count)]
+      (aset out-counts v (count (E v))))
+    (into [] out-counts)))
+
+(def ve (make-initial-graph "dickens_reads.txt"))
+
+(defn follow-chain [m v in-degs out-degs]
+  (loop [chain [v]]
+    (let [chain-end (last chain)
+          vals (m chain-end)]
+      (if (= 1 (in-degs chain-end) (out-degs chain-end))
+        (recur (conj chain (first vals)))
+        chain))))
+
+(defn drop-ends [sequence]
+  (drop 1 (drop-last sequence)))
+
+(defn collapse-chains [V E]
+  ;; determine where the chains are
+  (let [chains (atom {})
+        collapse (atom #{})
+        vrange (range (count V))
+        in-degs (in-degrees V E)
+        out-degs (out-degrees V E)]
+    (doseq [v vrange]
+        (let [chain (follow-chain E v in-degs out-degs)
+              chain-end (last chain)]
+          (swap! chains assoc v chain)
+          (if (< 1 (count chain))
+            (swap! collapse s/union (set (drop-ends chain))))))
+
+    ;; now that we've determined what values can be collapsed
+    ;; let's actually do the collapse operation and concatenate the vertex labels
+    (let [aE (atom {})
+          aV (atom V)]
+      (doseq [v vrange]
+        (if (not (contains? @collapse v))
+          (let [vchain    (@chains v)
+                chain-end (last vchain)
+                dvchain   (drop-last vchain)]
+
+            (if (< 1 (count dvchain))
+              (do
+                (swap! aE assoc v #{chain-end})
+                (swap! aV assoc v
+                       (str (V (first dvchain)) " "
+                            (str/join " " (map #(last-word (V %))
+                                               (rest dvchain))))))
+              (if-let [old-val (E v)]
+                (swap! aE assoc v old-val)
+                (swap! aV assoc v (V v)))))))
+
+      [@aV @aE])))
+
+(def collapsed-ve (apply collapse-chains ve))
 
 (defn graphviz [V E]
   (apply str
          (flatten [["digraph G {\n"]
                    (for [node (range (count V))]
-                     (str "\t" "node" node
-                          " [label=\"" (V node) "\"]"
-                          ";\n"))
+                     (if (< 0 (count (E node)))
+                       (str "\t" "node" node
+                            " [label=\"" (str node ". " (V node)) "\"]"
+                            ";\n")))
 
                    (for [[node siblings] E]
                      (for [sibling siblings]
                        (str "\t" "node" node " -> " "node" sibling ";\n")))
                    ["}"]])))
 
-(graphviz @V @E)
+(apply graphviz dgraph)
 
-(defn make-pdf-graph [V E graph-name]
+(defn make-pdf-graph [[V E] graph-name]
   (let [graph-file (str "data/" graph-name ".dot")
         graph-pdf  (str/replace graph-file "dot" "pdf")]
     (with-open [wrtr (io/writer graph-file)]
@@ -94,7 +194,9 @@
   
     (sh "dot" "-Tpdf" graph-file "-o" graph-pdf)))
 
-(make-pdf-graph @V @E "testing")
+(make-pdf-graph dgraph "testing")
+
+(make-pdf-graph collapsed-ve "ctest")
 
 ;; Now the idea is to trim things that could only belong to one parent
 ;; and to remove anything that doesn't follow a chain
