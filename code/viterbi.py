@@ -17,8 +17,8 @@ init_dist = [0.5,0.5]
 # transition probabilities
 tr = [
     #  to+   to-
-    [ 0.99, 0.01 ], # from+
-    [ 0.01, 0.99 ]  # from-
+    [ 0.9, 0.1 ], # from+
+    [ 0.1, 0.9 ]  # from-
 ]
 
 
