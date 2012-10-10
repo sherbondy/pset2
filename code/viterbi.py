@@ -42,13 +42,14 @@ def viterbi(X):
     The returned Y is a list of integers, 0=High-GC, 1=Low-GC.
     """
 
-    N = len(tr)
-    L = len(X)
-    assert len(em) == N
+    N = len(tr) # state count (derived from transitions)
+    L = len(X)  # path length
+    assert len(em) == N # a list of emission probabilities for each state
 
     V = [[0]*N for _ in xrange(L)]
     TB = [[0]*N for _ in xrange(L)]
     
+    # for i in len(observations)
     for i in xrange(0,L):
         Vprev = []
         if i == 0:
@@ -56,8 +57,20 @@ def viterbi(X):
         else:
             Vprev = V[i-1]
 
+        # for all possible states
         for k in xrange(N):
-            pass
+            # S_{l,i+1} = log(e_l(x_i+1)) + max_{k in Q} [S_{k,i} + log(a_{kl})]
+            p_e = log(em[k][X[i]]) # we only need to determine p_e once
+
+            # this syntax is a little odd, but we're generating a list of tuples of all
+            # (probability, state) combinations and finding the max.
+            # See: http://en.wikipedia.org/wiki/Viterbi_algorithm
+            # Hooray for sums! Floating point overflow is no good.
+            (prob, state) = max([ (p_e + (log(tr[k0][k]) + Vprev[k0]), k0) for k0 in xrange(N) ])
+
+            V[i][k]  = prob
+            TB[i][k] = state
+
             # YOUR CODE HERE
             # Set V[i][k] to the appropriate value for the Viterbi matrix, based
             #  on Vprev (V[i-1]) and the model parameters.
