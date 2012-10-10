@@ -51,7 +51,6 @@
 (p-scores|state [6 2 3 0] :N)
 ;; 5e-4
 
-
 (def alignment-1
   (map alignment-score
        [[:A :C :T :A] [:C :A :T :G] [:G :G :C :A] [:A :A :C :T]  [:C :C :T :G]
@@ -77,3 +76,32 @@ alignment-2 ;; (3 3 6 2 6 3 6 2 3 2)
 ;; p(N|a2),                |   p(C|a2)
 ;; 2.5000000000000012E-8   |   1.7496000000000002E-6
 
+;; It's much more likely that a1 came from N, and that a2 came from C
+
+(defn simulate-sequences [trials n state]
+  (let [wins (atom {:C 0 :N 0})]
+    (letfn [(rand-trial []
+              (rand-emissions state n))]
+     (doseq [_ (range trials)]
+       (let [scores (rand-trial)
+             [pc pn] (for [s [:C :N]] (p-scores|state scores s))
+             winner (if (> pc pn) :C :N)]
+         (swap! wins assoc winner (inc (@wins winner))))))
+    @wins))
+
+(simulate-sequences 10000 10 :N)
+;; b. The probability of a false positive p(C|sequence) > p(N|sequence)
+;; is surprisingly high (> 10%):
+;; Relative frequences ~ N = 8745 : C = 1255
+
+(simulate-sequences 10000 10 :C)
+;; c. Likewise: N = 1416, C = 8584
+
+;; d. There's a substantial chance for error when classifying based
+;; on a simple likelihood estimate
+
+;; e. This would allow us to make a better approximation using Bayes' rule:
+;; The background probability described = P(C). P(N) = 1 - P(C), and from here,
+;; since we know P(seq|C) and P(seq|N), we could determine the conditional
+;; probabilities P(C|seq) and P(N|seq):
+;; P(N|seq) = P(seq|N)*P(N) / P(seq)
