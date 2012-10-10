@@ -80,7 +80,7 @@ e
           (add-elem! E from-v to-v))))
     [V @E]))
 
-(def dgraph (make-initial-graph "dickens_reads.txt"))
+(def ve (make-initial-graph "dickens_reads.txt"))
 
 ;; {0 #{6}, 1 #{12}, 2 #{9 13 14}, 3 #{9 13 14}, 5 #{0 4}, 6 #{7}, 7 #{2},
 ;; 8 #{15}, 9 #{1}, 10 #{8}, 11 #{2}, 12 #{15}, 13 #{10}, 14 #{5}, 15 #{11}}
@@ -118,14 +118,13 @@ e
       (aset out-counts v (count (E v))))
     (into [] out-counts)))
 
-(def ve (make-initial-graph "dickens_reads.txt"))
-
 (defn follow-chain [m v in-degs out-degs]
   (loop [chain [v]]
     (let [chain-end (last chain)
-          vals (m chain-end)]
-      (if (= 1 (in-degs chain-end) (out-degs chain-end))
-        (recur (conj chain (first vals)))
+          val (first (m chain-end))]
+      (if (and val (= 1 (out-degs chain-end)
+                        (in-degs val)))
+        (recur (conj chain val))
         chain))))
 
 (defn drop-ends [sequence]
@@ -143,7 +142,7 @@ e
               chain-end (last chain)]
           (swap! chains assoc v chain)
           (if (< 1 (count chain))
-            (swap! collapse s/union (set (drop-ends chain))))))
+            (swap! collapse s/union (set (drop 1 chain))))))
 
     ;; now that we've determined which values should be collapsed
     ;; let's actually do the collapse operation and concatenate the vertex labels
@@ -152,23 +151,19 @@ e
       (doseq [v vrange]
         (if (not (contains? @collapse v))
           (let [vchain    (@chains v)
-                chain-end (last vchain)
-                dvchain   (drop-last vchain)]
-
-            (if (< 1 (count dvchain))
+                chain-end (last vchain)]
+            (if (< 1 (count vchain))
               (do
-                (swap! aE assoc v #{chain-end})
+                (swap! aE assoc v (E chain-end))
                 (swap! aV assoc v
-                       (str (V (first dvchain)) " "
+                       (str (V (first vchain)) " "
                             (str/join " " (map #(last-word (V %))
-                                               (rest dvchain))))))
+                                               (rest vchain))))))
               (if-let [old-val (E v)]
                 (swap! aE assoc v old-val)
                 (swap! aV assoc v (V v)))))))
 
       [@aV @aE])))
-
-(def collapsed-ve (apply collapse-chains ve))
 
 (defn graphviz [V E]
   (let [in-degs (in-degrees V E)
@@ -197,8 +192,8 @@ e
   
     (sh "dot" "-Tpdf" graph-file "-o" graph-pdf)))
 
+(def collapsed-ve (apply collapse-chains ve))
 (make-pdf-graph dgraph "testing")
-
 (make-pdf-graph collapsed-ve "ctest")
 
 ;; Now the idea is to trim things that could only belong to one parent
